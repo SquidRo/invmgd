@@ -60,13 +60,17 @@ def main(daemon_flag = True):
             print("Database does not exist")
         else:
             print(err)
+
+        logging.info("Connecting to sql server ... FAILED")
+        sys.exit(1)
+
     else:
-        logging.info("mysql server connected ...")
-        cnx.close()
+        logging.info("Connecting to sql server ... DONE")
+        #cnx.close()
 
     #
     #
-    api_app = MyService()
+    api_app = MyService(cnx)
     gunicorn_app = GunicornApp(api_app, options)
 
     gunicorn_app.cfg.set('loglevel', 'debug')
