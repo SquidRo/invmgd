@@ -1,33 +1,56 @@
-import falcon, pdb
+import falcon, pdb, json, logging
+from util import util_utl, util_sql
 
-class InventoryTable(object):
+
+def build_ret_dict (ret_code, ret_desc):
+    tmp_ret = {'result': {} }
+
+    tmp_ret ['result']['code'] = ret_code
+    if ret_desc:
+        tmp_ret ['result']['desc'] = ret_desc
+
+    return tmp_ret
+
+class StorageTbl(object):
+    def __init__(self, sql_cnx):
+        self.sql_cnx = sql_cnx
+
+    def on_post_feed(self, req, resp):
+        obj = req.get_media()
+        data = obj.get('data')
+
+        # 1. query storage for free location
+        # 2. update location with INV_ID and count
+        # 3. insert a record into FEEDING_RECORD if update location ok
+        free_locs = util_sql.get_free_locs(self.sql_cnx)
+
+        idx = 0
+        for feed_one in data:
+            if idx < len(free_locs):
+                loc_id = free_locs[idx]
+                if util_sql.put_inv_to_loc(self.sql_cnx, loc_id, feed_one) > 0:
+                    ret_dict = build_ret_dict(200, "Fail to execute sql operations")
+                else:
+                    ret_dict = build_ret_dict(100, None)
+            else:
+                err_msg = "No space for a new inventory !"
+                logging.error(err_msg)
+                ret_dict = build_ret_dict(200, err_msg)
+
+        resp.status = falcon.HTTP_200
+        resp.text   = json.dumps(ret_dict)
+
+    def on_post_pick(self, req, resp):
+        pass
+
+
+class InventoryTbl(object):
     def __init__(self, sql_cnx):
         self.sql_cnx = sql_cnx
 
     def on_get(self, req, resp):
-        resp.text = '{"message": "Hello world!"}'
+        resp.text = json.dumps({"data" : util_sql.INVENTORY_ID_MAP})
         resp.status = falcon.HTTP_200
-
-    def on_get_dump(self, req, resp):
-        cursor = self.sql_cnx.cursor()
-
-        query = ("SHOW DATABASES")
-
-        cursor.execute(query)
-
-        data = cursor.fetchall()
-
-       # pdb.set_trace()
-
-        resp.text = "message : {}".format(data)
-        resp.status = falcon.HTTP_200
-
-    def on_post(self, req, resp):
-        obj = req.get_media()
-        msg = obj.get('message')
-
-        resp.status = falcon.HTTP_200
-        resp.media = {'message' : msg}
 
 
 class MyService(falcon.App):
@@ -37,11 +60,14 @@ class MyService(falcon.App):
         self.sql_cnx = sql_cnx
 
         # Create resources
-        inv_tbl = InventoryTable(sql_cnx)
+        inv_tbl = InventoryTbl(sql_cnx)
+        sto_tbl = StorageTbl(sql_cnx)
 
         # Build routes
-        self.add_route('/inventory',      inv_tbl)
-        self.add_route('/inventory/dump', inv_tbl, suffix='dump')
+        self.add_route('/inventory', inv_tbl)
+
+        self.add_route('/feed', sto_tbl, suffix='feed')
+        self.add_route('/pick', sto_tbl, suffix='pick')
 
     def start(self):
         """ A hook to when a Gunicorn worker calls run()."""

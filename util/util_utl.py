@@ -31,7 +31,7 @@ CFG_TBL = {
     "SQL_PORT"       : None,
     "SQL_USER"       : None,
     "SQL_PASS"       : None,
-    "SQL_DB"         : "stockManager",
+    "SQL_DB"         : None,
     "BIND_HOST"      : None,
     "BIND_PORT"      : None,
     "CFG_PATH"       : None,

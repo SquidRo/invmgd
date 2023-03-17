@@ -10,7 +10,7 @@ Steps to install invmgd on DUT
 - On DUT
 ```
   1. pip3 install required packages 
-  2. dpkg -i python3-invmg_0.1-1_all.deb
+  2. dpkg -i python3-invmgd_0.1-1_all.deb
   3. edit /etc/invmgd/config.ini for correct sql server's hostname/port
   4. systemctl start invmgd.service
   5. troubleshooting with the /var/log/invmgd.log

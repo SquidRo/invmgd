@@ -3,9 +3,7 @@ import time, logging, argparse, sys, os, socket, signal, pdb
 from gunicorn.app.base import BaseApplication
 
 from inv_app import MyService
-from util import util_utl
-
-import mysql.connector
+from util import util_utl, util_sql
 
 class GunicornApp(BaseApplication):
     """ Custom Gunicorn application
@@ -38,41 +36,20 @@ def main(daemon_flag = True):
                             util_utl.CFG_TBL["CFG_PATH"]))
         sys.exit(1)
 
+    # setup sql cnx
+    sql_cnx = util_sql.setup_sql_cnx()
+
+    # setup rest api server
     options = {
-    	'workers': 1,
+        'workers': 1,
         'bind': '{}:{}'.format(util_utl.CFG_TBL["BIND_HOST"],
-			       util_utl.CFG_TBL["BIND_PORT"])
+                               util_utl.CFG_TBL["BIND_PORT"])
     }
 
-    # SQL TEST START
-    try:
-        cnx = mysql.connector.connect(
-                user     = util_utl.CFG_TBL["SQL_USER"],
-                password = util_utl.CFG_TBL["SQL_PASS"],
-                host     = util_utl.CFG_TBL["SQL_HOST"],
-                port     = util_utl.CFG_TBL["SQL_PORT"],
-                database = util_utl.CFG_TBL["SQL_DB"])
-
-    except mysql.connector.Error as err:
-        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-            print("Something is wrong with your user name or password")
-        elif err.errno == errorcode.ER_BAD_DB_ERROR:
-            print("Database does not exist")
-        else:
-            print(err)
-
-        logging.info("Connecting to sql server ... FAILED")
-        sys.exit(1)
-
-    else:
-        logging.info("Connecting to sql server ... DONE")
-        #cnx.close()
-
-    #
-    #
-    api_app = MyService(cnx)
+    api_app = MyService(sql_cnx)
     gunicorn_app = GunicornApp(api_app, options)
 
+    gunicorn_app.cfg.set('timeout', 0) # let worker never timeout for happy debugging
     gunicorn_app.cfg.set('loglevel', 'debug')
     gunicorn_app.cfg.set('capture_output', 'True')
     gunicorn_app.cfg.set('accesslog', ['-', util_utl.get_logfile_path(daemon_flag)][not args.debug])
