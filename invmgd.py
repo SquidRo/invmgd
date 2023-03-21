@@ -1,9 +1,9 @@
-import time, logging, argparse, sys, os, socket, signal, pdb
+import time, logging, argparse, sys, os, socket, signal, queue, pdb
 
 from gunicorn.app.base import BaseApplication
 
 from inv_app import MyService
-from util import util_utl, util_sql
+from util import util_utl, util_sql, util_rack
 
 class GunicornApp(BaseApplication):
     """ Custom Gunicorn application
@@ -36,8 +36,11 @@ def main(daemon_flag = True):
                             util_utl.CFG_TBL["CFG_PATH"]))
         sys.exit(1)
 
+    # setup a worker thread for the rack-bot
+    util_rack.setup_rack_worker()
+
     # setup sql cnx
-    sql_cnx = util_sql.setup_sql_cnx()
+    util_sql.setup_sql_cnx()
 
     # setup rest api server
     options = {
@@ -46,7 +49,7 @@ def main(daemon_flag = True):
                                util_utl.CFG_TBL["BIND_PORT"])
     }
 
-    api_app = MyService(sql_cnx)
+    api_app = MyService()
     gunicorn_app = GunicornApp(api_app, options)
 
     gunicorn_app.cfg.set('timeout', 0) # let worker never timeout for happy debugging

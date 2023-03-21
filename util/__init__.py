@@ -1,3 +1,3 @@
 
-__all__ = [ 'util_utl', 'util_sql'
+__all__ = [ 'util_utl', 'util_sql', 'util_rack'
           ]
