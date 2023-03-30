@@ -9,6 +9,8 @@ import mysql.connector, pdb
 
 from util import util_utl
 
+DFLT_LOC_NUM = 30
+
 DFLT_INV_DATA = [
     ("K2V4PCB",   9),
     ("TPM",       8),
@@ -19,15 +21,7 @@ DFLT_INV_DATA = [
     ("BRACKET",   3)
 ]
 
-DFLT_STO_DATA = [
-    (),
-    (),
-    (),
-    (),
-    (),
-    (),
-    ()
-]
+DFLT_STO_DATA = [()] * DFLT_LOC_NUM
 
 TBL_NAME_STORAGE   = 'STORAGE'
 TBL_NAME_INVENTORY = 'INVENTORY'
@@ -49,6 +43,7 @@ SQL_TABLES[TBL_NAME_STORAGE] = (
     "  `LOC_ID` int NOT NULL AUTO_INCREMENT,"
     "  `INV_ID` int,"
     "  `QUANTITY` int,"
+    "  `STACK_ID` int,"
     "  `READY` int DEFAULT NULL, "
     "  PRIMARY KEY (`LOC_ID`)"
     ") ENGINE=InnoDB".format(TBL_NAME_STORAGE) )
@@ -59,6 +54,7 @@ SQL_TABLES[TBL_NAME_FEED_REC] = (
     "  `LOC_ID` int NOT NULL,"
     "  `INV_ID` int NOT NULL,"
     "  `EMP_ID` varchar(20) NOT NULL,"
+    "  `STACK_ID` int NOT NULL,"
     "  `FEED_QUAN` int NOT NULL,"
     "  `DATE` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
     "  `RACK_BOT` int DEFAULT NULL,"
@@ -69,6 +65,7 @@ SQL_TABLES[TBL_NAME_PICK_REC] = (
     "CREATE TABLE `{}` ("
     "  `PR_ID` int NOT NULL AUTO_INCREMENT,"
     "  `LOC_ID` int NOT NULL,"
+    "  `STACK_ID` int NOT NULL,"
     "  `INV_ID` int NOT NULL,"
     "  `DISC_QUAN` int NOT NULL,"
     "  `CONV_ID` int,"
@@ -234,9 +231,10 @@ def rem_inv_from_loc(loc_data):
         SQL_CNX.commit()
 
         job = {
-            'INV_ID' : loc_data[1],
-            'COUNT'  : loc_data[2],
-            'LOC_ID' : loc_data[0],
+            'INV_ID'  : loc_data[1],
+            'COUNT'   : loc_data[2],
+            'LOC_ID'  : loc_data[0],
+            'STACK_ID': loc_data[3]
         }
 
     except mysql.connector.Error as err:
@@ -259,7 +257,7 @@ def get_inv_locs(inv_name):
         logging.error("Incorrect inventory name !!!")
         return []
 
-    sql_stmt = ("SELECT LOC_ID, INV_ID, QUANTITY FROM {} "
+    sql_stmt = ("SELECT LOC_ID, INV_ID, QUANTITY, STACK_ID FROM {} "
                 "WHERE INV_ID={} and `READY`=1".format(TBL_NAME_STORAGE, inv_id))
 
     try:
@@ -286,7 +284,7 @@ def put_inv_to_loc(loc_id, data):
 
     # ex:
     #   loc_id : (1,)
-    #   data   : {'item': 'K2V4PCB', 'count': 10, 'emp_id': 'A1234567'}
+    #   data   : {'item': 'K2V4PCB', 'count': 10, 'emp_id': 'A1234567', "stack_id": 1}
     if data['item'] in INVENTORY_ID_MAP:
         inv_id = INVENTORY_ID_MAP[data['item']]['id']
     else:
@@ -302,22 +300,28 @@ def put_inv_to_loc(loc_id, data):
     else:
         emp_id = 'UNKNOWN'
 
-    if None in [inv_id, count]:
-        logging.error("Incorrect inventory name or count !!!")
+    if 'stack_id' in data:
+        stack_id = data['stack_id']
+    else:
+        stack_id = None
+
+    if None in [inv_id, count, stack_id]:
+        logging.error("Failed to get inventory id, count or stack id !!!")
         return job
 
-    sql_stmt = ("UPDATE {} SET INV_ID={}, QUANTITY={}, READY=0 "
-                "WHERE LOC_ID={}".format(TBL_NAME_STORAGE, inv_id, count, loc_id[0]))
+    sql_stmt = ("UPDATE {} SET INV_ID={}, QUANTITY={}, STACK_ID={}, READY=0 "
+                "WHERE LOC_ID={}".format(TBL_NAME_STORAGE, inv_id, count, stack_id, loc_id[0]))
 
     try:
         sql_cursor.execute(sql_stmt)
         SQL_CNX.commit()
 
         job = {
-            'INV_ID' : inv_id,
-            'COUNT'  : count,
-            'LOC_ID' : loc_id[0],
-            'EMP_ID' : emp_id
+            'INV_ID'  : inv_id,
+            'COUNT'   : count,
+            'LOC_ID'  : loc_id[0],
+            'EMP_ID'  : emp_id,
+            'STACK_ID': stack_id
         }
 
     except mysql.connector.Error as err:
@@ -331,10 +335,10 @@ def put_inv_to_loc(loc_id, data):
 #        None        - FAIL
 @log_func_name
 def add_feed_rec(data):
-    # ex: data : {'INV_ID': 1, 'COUNT': 10, 'LOC_ID': 3, 'EMP_ID': 'A1234567'
+    # ex: data : {'INV_ID': 1, 'COUNT': 10, 'LOC_ID': 3, 'EMP_ID': 'A1234567', 'STACK_ID': 1}
     sql_stmt = ("INSERT INTO {} "
-                "(INV_ID, LOC_ID, EMP_ID, FEED_QUAN) "
-                "VALUES ( %s, %s, %s, %s)".format(
+                "(INV_ID, LOC_ID, EMP_ID, FEED_QUAN, STACK_ID) "
+                "VALUES ( %s, %s, %s, %s, %s)".format(
                 TBL_NAME_FEED_REC))
 
     sql_cursor = SQL_CNX.cursor()
@@ -343,7 +347,7 @@ def add_feed_rec(data):
     try:
         sql_cursor.execute(
             sql_stmt,
-            (data['INV_ID'], data['LOC_ID'], data['EMP_ID'], data['COUNT'])
+            (data['INV_ID'], data['LOC_ID'], data['EMP_ID'], data['COUNT'], data['STACK_ID'])
             )
         SQL_CNX.commit()
 
@@ -360,10 +364,10 @@ def add_feed_rec(data):
 #        None        - FAIL
 @log_func_name
 def add_pick_rec(data):
-    # ex: data : {'INV_ID': 1, 'COUNT': 10, 'LOC_ID': 3, 'EMP_ID': 'A1234567'
+    # ex: data : {'INV_ID': 1, 'COUNT': 10, 'LOC_ID': 3, 'EMP_ID': 'A1234567', 'STACK_ID'}
     sql_stmt = ("INSERT INTO {} "
-                "(INV_ID, LOC_ID, REASON, DISC_QUAN) "
-                "VALUES ( %s, %s, %s, %s)".format(
+                "(INV_ID, LOC_ID, REASON, DISC_QUAN, STACK_ID) "
+                "VALUES ( %s, %s, %s, %s, %s)".format(
                 TBL_NAME_PICK_REC))
 
     sql_cursor = SQL_CNX.cursor()
@@ -372,7 +376,7 @@ def add_pick_rec(data):
     try:
         sql_cursor.execute(
             sql_stmt,
-            (data['INV_ID'], data['LOC_ID'], data['REASON'], data['COUNT'])
+            (data['INV_ID'], data['LOC_ID'], data['REASON'], data['COUNT'], data['STACK_ID'])
             )
         SQL_CNX.commit()
 
@@ -442,7 +446,7 @@ def upd_sto_ready(rdy_val, loc_id):
 
 def clear_sto_loc(loc_id):
     sql_stmt = ("UPDATE {} "
-                "SET INV_ID=NULL, QUANTITY=NULL, READY=NULL "
+                "SET INV_ID=NULL, QUANTITY=NULL, READY=NULL, STACK_ID=NULL "
                 "WHERE LOC_ID={}".format(
                 TBL_NAME_STORAGE, loc_id))
 
@@ -482,6 +486,7 @@ def upd_rec(data, is_ok = True):
             # set READY to 1
             upd_sto_ready(1, data['LOC_ID'])
 
+"""
 # check if rack-bot available for moveing job
 def is_rack_bot_ready():
     sql_cursor = SQL_CNX.cursor()
@@ -498,3 +503,4 @@ def is_rack_bot_ready():
     sql_cursor.close()
 
     return [True, False] [len(result) > 0]
+"""

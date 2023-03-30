@@ -16,7 +16,7 @@ class StorageTbl(object):
         pass
 
     def chk_rack_bot(self):
-        is_bot_ok = util_sql.is_rack_bot_ready()
+        is_bot_ok = util_rack.is_rack_bot_ready()
 
         ret_dict = None
         if not is_bot_ok:
@@ -109,6 +109,7 @@ class StorageTbl(object):
                         util_rack.add_job(job_data)
                         ret_dict = build_ret_dict(100, None)
                         ret_dict['pkreq_id'] = rec_id
+                        ret_dict['stack_id'] = job_data['STACK_ID']
                     else:
                         ret_dict = build_ret_dict(200, "Fail to execute sql operations")
 
