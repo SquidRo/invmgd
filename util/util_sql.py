@@ -7,21 +7,7 @@
 import logging, functools
 import mysql.connector, pdb
 
-from util import util_utl
-
-DFLT_LOC_NUM = 30
-
-DFLT_INV_DATA = [
-    ("K2V4PCB",   9),
-    ("TPM",       8),
-    ("IRON",      7),
-    ("CAGE",      6),
-    ("HEAT_SINK", 5),
-    ("AIR_BAFFLE",4),
-    ("BRACKET",   3)
-]
-
-DFLT_STO_DATA = [()] * DFLT_LOC_NUM
+from util import util_utl, util_dflt
 
 TBL_NAME_STORAGE   = 'STORAGE'
 TBL_NAME_INVENTORY = 'INVENTORY'
@@ -174,7 +160,7 @@ def create_dflt_data():
 
     sql_cursor = SQL_CNX.cursor()
 
-    for data in DFLT_INV_DATA:
+    for data in util_dflt.DFLT_INV_DATA:
         # Insert defalt inventory
         sql_cursor.execute(add_inv, data)
 
@@ -182,9 +168,10 @@ def create_dflt_data():
     SQL_CNX.commit()
 
     add_sto = ("INSERT INTO {} "
-               "VALUES ()".format(TBL_NAME_STORAGE))
+               "(INV_ID, QUANTITY, STACK_ID, READY) "
+               "VALUES (%s, %s, %s, %s)".format(TBL_NAME_STORAGE))
 
-    for data in DFLT_STO_DATA:
+    for data in util_dflt.DFLT_STO_DATA:
         sql_cursor.execute(add_sto, data)
 
     SQL_CNX.commit()
