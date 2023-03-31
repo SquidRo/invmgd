@@ -5,13 +5,13 @@
 #
 
 DFLT_INV_DATA = [
-    ("K2V4PCB",   9),
-    ("TPM",       8),
-    ("IRON",      7),
-    ("CAGE",      6),
-    ("HEAT_SINK", 5),
-    ("AIR_BAFFLE",4),
-    ("BRACKET",   3)
+    ("K2V4PCB",   9, 6),
+    ("TPM",       8, 2),
+    ("IRON",      7, 3),
+    ("CAGE",      6, 4),
+    ("HEAT_SINK", 5, 6),
+    ("AIR_BAFFLE",4, 3),
+    ("BRACKET",   3, 3)
 ]
 
 DFLT_STO_DATA = [

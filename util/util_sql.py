@@ -21,6 +21,7 @@ SQL_TABLES[TBL_NAME_INVENTORY] = (
     "  `INV_ID` int NOT NULL AUTO_INCREMENT,"
     "  `INV_NAME` varchar(50) NOT NULL,"
     "  `WEIGHT` int NOT NULL,"
+    "  `RESERVED_STACK` int NOT NULL,"
     "  PRIMARY KEY (`INV_ID`)"
     ") ENGINE=InnoDB".format(TBL_NAME_INVENTORY) )
 
@@ -155,8 +156,8 @@ def setup_sql_cnx():
 # create default data for sw develepment
 def create_dflt_data():
     add_inv = ("INSERT INTO {} "
-               "(INV_NAME, WEIGHT) "
-               "VALUES (%s, %s)".format(TBL_NAME_INVENTORY))
+               "(INV_NAME, WEIGHT, RESERVED_STACK) "
+               "VALUES (%s, %s, %s)".format(TBL_NAME_INVENTORY))
 
     sql_cursor = SQL_CNX.cursor()
 
@@ -241,7 +242,7 @@ def get_inv_locs(inv_name):
         inv_id = None
 
     if None in [inv_id]:
-        logging.error("Incorrect inventory name !!!")
+        logging.error("Incorrect inventory name - {}!!! ".format(inv_name))
         return []
 
     sql_stmt = ("SELECT LOC_ID, INV_ID, QUANTITY, STACK_ID FROM {} "
