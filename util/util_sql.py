@@ -78,19 +78,49 @@ def create_sql_db(sql_cursor, db_name):
 
     return ret_val
 
+# create default data for sw develepment
+def create_dflt_data():
+    add_inv = ("INSERT INTO {} "
+               "(INV_NAME, WEIGHT, RESERVED_STACK) "
+               "VALUES (%s, %s, %s)".format(TBL_NAME_INVENTORY))
+
+    db, sql_cursor = get_sql_cursor()
+
+    for data in util_dflt.DFLT_INV_DATA:
+        # Insert defalt inventory
+        sql_cursor.execute(add_inv, data)
+
+    # Make sure data is committed to the database
+    db.commit()
+
+    add_sto = ("INSERT INTO {} "
+               "(INV_ID, QUANTITY, STACK_ID, READY) "
+               "VALUES (%s, %s, %s, %s)".format(TBL_NAME_STORAGE))
+
+    for data in util_dflt.DFLT_STO_DATA:
+        sql_cursor.execute(add_sto, data)
+
+    db.commit()
+    sql_cursor.close()
+    db.close()
+
 # 1. create db if db does not exist
 # 2. create table if table does not exist
 def create_sql_tbls(db_name):
     do_dflt_data = True
-    sql_cursor = SQL_CNX.cursor()
+
+    db, sql_cursor = get_sql_cursor(False)
+
     try:
+
         sql_cursor.execute("USE {}".format(db_name))
+
     except mysql.connector.Error as err:
         logging.error("Database {} does not exists.".format(db_name))
         if err.errno == mysql.connector.errorcode.ER_BAD_DB_ERROR:
             create_sql_db(sql_cursor, db_name)
             logging.info("Database {} created successfully.".format(db_name))
-            SQL_CNX.database = db_name
+            sql_cursor.execute("USE {}".format(db_name))
         else:
             logging.error(err)
 
@@ -112,6 +142,7 @@ def create_sql_tbls(db_name):
         logging.info(log_msg + log_data)
 
     sql_cursor.close()
+    db.close()
 
     if do_dflt_data:
        create_dflt_data()
@@ -125,6 +156,20 @@ def log_func_name(f):
         return result
     return wrapped
 
+def build_inventory_id_map():
+    db, sql_cursor = get_sql_cursor()
+
+    query = ("SELECT * FROM {} ".format(TBL_NAME_INVENTORY))
+
+    sql_cursor.execute(query)
+    result = sql_cursor.fetchall()
+
+    for one_inv in result:
+        INVENTORY_ID_MAP[one_inv[1]] = {'id' : one_inv[0]}
+
+    sql_cursor.close()
+    db.close()
+
 # return cnx if connect to sql server ok
 # also create default tables and inventroy id mapping
 # for later operations
@@ -136,7 +181,9 @@ def setup_sql_cnx():
                 user     = util_utl.CFG_TBL["SQL_USER"],
                 password = util_utl.CFG_TBL["SQL_PASS"],
                 host     = util_utl.CFG_TBL["SQL_HOST"],
-                port     = util_utl.CFG_TBL["SQL_PORT"])
+                port     = util_utl.CFG_TBL["SQL_PORT"],
+                pool_name = 'test',
+                pool_size = 3)
 
     except mysql.connector.Error as err:
         if err.errno == mysql.connector.errorcode.ER_ACCESS_DENIED_ERROR:
@@ -153,46 +200,16 @@ def setup_sql_cnx():
 
     build_inventory_id_map()
 
-# create default data for sw develepment
-def create_dflt_data():
-    add_inv = ("INSERT INTO {} "
-               "(INV_NAME, WEIGHT, RESERVED_STACK) "
-               "VALUES (%s, %s, %s)".format(TBL_NAME_INVENTORY))
-
-    sql_cursor = SQL_CNX.cursor()
-
-    for data in util_dflt.DFLT_INV_DATA:
-        # Insert defalt inventory
-        sql_cursor.execute(add_inv, data)
-
-    # Make sure data is committed to the database
-    SQL_CNX.commit()
-
-    add_sto = ("INSERT INTO {} "
-               "(INV_ID, QUANTITY, STACK_ID, READY) "
-               "VALUES (%s, %s, %s, %s)".format(TBL_NAME_STORAGE))
-
-    for data in util_dflt.DFLT_STO_DATA:
-        sql_cursor.execute(add_sto, data)
-
-    SQL_CNX.commit()
-    sql_cursor.close()
-
-def build_inventory_id_map():
-    sql_cursor = SQL_CNX.cursor()
-
-    query = ("SELECT * FROM {} ".format(TBL_NAME_INVENTORY))
-
-    sql_cursor.execute(query)
-    result = sql_cursor.fetchall()
-
-    for one_inv in result:
-        INVENTORY_ID_MAP[one_inv[1]] = {'id' : one_inv[0]}
-
-    sql_cursor.close()
+# get connection from pool, and create cursor
+def get_sql_cursor(is_use_db = True):
+    db = mysql.connector.connect(pool_name = 'test')
+    db_cursor = db.cursor()
+    if is_use_db:
+        db_cursor.execute("USE {}".format(util_utl.CFG_TBL["SQL_DB"]))
+    return db, db_cursor
 
 def get_free_locs():
-    sql_cursor = SQL_CNX.cursor()
+    db, sql_cursor = get_sql_cursor()
 
     sql_stmt = ("SELECT LOC_ID FROM {} "
                 "WHERE INV_ID IS NULL".format(TBL_NAME_STORAGE))
@@ -204,19 +221,20 @@ def get_free_locs():
         logging.error("execute {} : {}".format(sql_stmt, err))
 
     sql_cursor.close()
+    db.close()
 
     return result
 
 # ex: loc_data = (0, 1, 10)
 def rem_inv_from_loc(loc_data):
     job = None
-    sql_cursor = SQL_CNX.cursor()
+    db, sql_cursor = get_sql_cursor()
 
     sql_stmt = ("UPDATE {} SET READY=0 "
                 "WHERE LOC_ID={}".format(TBL_NAME_STORAGE, loc_data[0]))
     try:
         sql_cursor.execute(sql_stmt)
-        SQL_CNX.commit()
+        db.commit()
 
         job = {
             'INV_ID'  : loc_data[1],
@@ -229,11 +247,13 @@ def rem_inv_from_loc(loc_data):
         logging.error("execute {} : {}".format(sql_stmt, err))
 
     sql_cursor.close()
+    db.close()
 
     return job
 
 def get_inv_locs(inv_name):
-    sql_cursor = SQL_CNX.cursor()
+    db, sql_cursor = get_sql_cursor()
+
     ret_locs = []
 
     if inv_name in INVENTORY_ID_MAP:
@@ -255,6 +275,7 @@ def get_inv_locs(inv_name):
         logging.error("execute {} : {}".format(sql_stmt, err))
 
     sql_cursor.close()
+    db.close()
 
     return result
 
@@ -268,7 +289,7 @@ def get_inv_locs(inv_name):
 #        }
 def put_inv_to_loc(loc_id, data):
     job        = None
-    sql_cursor = SQL_CNX.cursor()
+    db, sql_cursor = get_sql_cursor()
 
     # ex:
     #   loc_id : (1,)
@@ -302,7 +323,7 @@ def put_inv_to_loc(loc_id, data):
 
     try:
         sql_cursor.execute(sql_stmt)
-        SQL_CNX.commit()
+        db.commit()
 
         job = {
             'INV_ID'  : inv_id,
@@ -316,6 +337,7 @@ def put_inv_to_loc(loc_id, data):
         logging.error("execute {} : {}".format(sql_stmt, err))
 
     sql_cursor.close()
+    db.close()
 
     return job
 
@@ -329,7 +351,7 @@ def add_feed_rec(data):
                 "VALUES ( %s, %s, %s, %s, %s)".format(
                 TBL_NAME_FEED_REC))
 
-    sql_cursor = SQL_CNX.cursor()
+    db, sql_cursor = get_sql_cursor()
 
     rec_id = None
     try:
@@ -337,7 +359,7 @@ def add_feed_rec(data):
             sql_stmt,
             (data['INV_ID'], data['LOC_ID'], data['EMP_ID'], data['COUNT'], data['STACK_ID'])
             )
-        SQL_CNX.commit()
+        db.commit()
 
         rec_id = sql_cursor.lastrowid
 
@@ -345,6 +367,7 @@ def add_feed_rec(data):
         logging.error("execute {} : {}".format(sql_stmt, err))
 
     sql_cursor.close()
+    db.close()
 
     return rec_id
 
@@ -358,7 +381,7 @@ def add_pick_rec(data):
                 "VALUES ( %s, %s, %s, %s, %s)".format(
                 TBL_NAME_PICK_REC))
 
-    sql_cursor = SQL_CNX.cursor()
+    db, sql_cursor = get_sql_cursor()
 
     rec_id = None
     try:
@@ -366,7 +389,7 @@ def add_pick_rec(data):
             sql_stmt,
             (data['INV_ID'], data['LOC_ID'], data['REASON'], data['COUNT'], data['STACK_ID'])
             )
-        SQL_CNX.commit()
+        db.commit()
 
         rec_id = sql_cursor.lastrowid
 
@@ -374,6 +397,7 @@ def add_pick_rec(data):
         logging.error("execute {} : {}".format(sql_stmt, err))
 
     sql_cursor.close()
+    db.close()
 
     return rec_id
 
@@ -387,16 +411,17 @@ def upd_pkreq_conv_id(rec_id, conv_id):
                 "WHERE PR_ID={}".format(
                 TBL_NAME_PICK_REC, conv_id, rec_id))
 
-    sql_cursor = SQL_CNX.cursor()
+    db, sql_cursor = get_sql_cursor()
 
     try:
         sql_cursor.execute(sql_stmt)
-        SQL_CNX.commit()
+        db.commit()
     except mysql.connector.Error as err:
         logging.error("execute {} : {}".format(sql_stmt, err))
         ret_val = 1
 
     sql_cursor.close()
+    db.close()
 
     return ret_val
 
@@ -406,15 +431,16 @@ def upd_history_rec(tbl_name, rack_bot, id_name, rec_id):
                 "WHERE {}={}".format(
                 tbl_name, rack_bot, id_name, rec_id))
 
-    sql_cursor = SQL_CNX.cursor()
+    db, sql_cursor = get_sql_cursor()
 
     try:
         sql_cursor.execute(sql_stmt)
-        SQL_CNX.commit()
+        db.commit()
     except mysql.connector.Error as err:
         logging.error("execute {} : {}".format(sql_stmt, err))
 
     sql_cursor.close()
+    db.close()
 
 def upd_sto_ready(rdy_val, loc_id):
     sql_stmt = ("UPDATE {} "
@@ -422,15 +448,16 @@ def upd_sto_ready(rdy_val, loc_id):
                 "WHERE LOC_ID={}".format(
                 TBL_NAME_STORAGE, rdy_val, loc_id))
 
-    sql_cursor = SQL_CNX.cursor()
+    db, sql_cursor = get_sql_cursor()
 
     try:
         sql_cursor.execute(sql_stmt)
-        SQL_CNX.commit()
+        db.commit()
     except mysql.connector.Error as err:
         logging.error("execute {} : {}".format(sql_stmt, err))
 
     sql_cursor.close()
+    db.close()
 
 def clear_sto_loc(loc_id):
     sql_stmt = ("UPDATE {} "
@@ -438,15 +465,16 @@ def clear_sto_loc(loc_id):
                 "WHERE LOC_ID={}".format(
                 TBL_NAME_STORAGE, loc_id))
 
-    sql_cursor = SQL_CNX.cursor()
+    db, sql_cursor = get_sql_cursor()
 
     try:
         sql_cursor.execute(sql_stmt)
-        SQL_CNX.commit()
+        db.commit()
     except mysql.connector.Error as err:
         logging.error("execute {} : {}".format(sql_stmt, err))
 
     sql_cursor.close()
+    db.close()
 
 @log_func_name
 def upd_rec(data, is_ok = True):
