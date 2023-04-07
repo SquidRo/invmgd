@@ -4,6 +4,7 @@
 # Utility APIs for default inventory parameters
 #
 
+# ex: (name, weight, reserved_stack)
 DFLT_INV_DATA = [
     ("K2V4PCB",   9, 6),
     ("TPM",       8, 2),
@@ -14,34 +15,43 @@ DFLT_INV_DATA = [
     ("BRACKET",   3, 3)
 ]
 
+DFLT_NUM_PCB      = 180
+DFLT_NUM_TPM      = 4095
+DFLT_NUM_IRON     = 1800
+DFLT_NUM_CAGE     = 336
+DFLT_NUM_HEAT_SINK= 234
+DFLT_NUM_AIR_B    = 780
+DFLT_NUM_BRACKET  = 1144
+
+# ex: (inv_id, quan, stk_id, ready)
 DFLT_STO_DATA = [
-    (1, 180, 1, 1),
-    (1, 180, 2, 1),
-    (1, 180, 3, 1),
-    (1, 180, 4, 1),
-    (1, 180, 5, 1),
-    (1, 180, 6, 1),
-    (2, 4095, 7, 1),
-    (2, 4095, 8, 1),
-    (3, 1800, 9, 1),
-    (3, 1800, 10, 1),
-    (3, 1800, 11, 1),
-    (4, 336, 12, 1),
-    (4, 336, 13, 1),
-    (4, 336, 14, 1),
-    (4, 336, 15, 1),
-    (5, 234, 16, 1),
-    (5, 234, 17, 1),
-    (5, 234, 18, 1),
-    (5, 234, 19, 1),
-    (5, 234, 20, 1),
-    (5, 234, 21, 1),
-    (6, 780, 22, 1),
-    (6, 780, 23, 1),
-    (6, 780, 24, 1),
-    (7, 1144, 25, 1),
-    (7, 1144, 26, 1),
-    (7, 1144, 27, 1),
+    (1, DFLT_NUM_PCB, 1, 1),
+    (1, DFLT_NUM_PCB, 2, 1),
+    (1, DFLT_NUM_PCB, 3, 1),
+    (1, DFLT_NUM_PCB, 4, 1),
+    (1, DFLT_NUM_PCB, 5, 1),
+    (1, DFLT_NUM_PCB, 6, 1),
+    (2, DFLT_NUM_TPM, 7, 1),
+    (2, DFLT_NUM_TPM, 8, 1),
+    (3, DFLT_NUM_IRON, 9, 1),
+    (3, DFLT_NUM_IRON, 10, 1),
+    (3, DFLT_NUM_IRON, 11, 1),
+    (4, DFLT_NUM_CAGE, 12, 1),
+    (4, DFLT_NUM_CAGE, 13, 1),
+    (4, DFLT_NUM_CAGE, 14, 1),
+    (4, DFLT_NUM_CAGE, 15, 1),
+    (5, DFLT_NUM_HEAT_SINK, 16, 1),
+    (5, DFLT_NUM_HEAT_SINK, 17, 1),
+    (5, DFLT_NUM_HEAT_SINK, 18, 1),
+    (5, DFLT_NUM_HEAT_SINK, 19, 1),
+    (5, DFLT_NUM_HEAT_SINK, 20, 1),
+    (5, DFLT_NUM_HEAT_SINK, 21, 1),
+    (6, DFLT_NUM_AIR_B, 22, 1),
+    (6, DFLT_NUM_AIR_B, 23, 1),
+    (6, DFLT_NUM_AIR_B, 24, 1),
+    (7, DFLT_NUM_BRACKET, 25, 1),
+    (7, DFLT_NUM_BRACKET, 26, 1),
+    (7, DFLT_NUM_BRACKET, 27, 1),
     (None, None, None, None),
     (None, None, None, None),
     (None, None, None, None),

@@ -1,5 +1,6 @@
 import falcon, pdb, json, logging
-from util import util_utl, util_sql, util_rack
+from falcon.media.validators.jsonschema import validate
+from util import util_utl, util_sql, util_rack, util_schema
 
 
 def build_ret_dict (ret_code, ret_desc):
@@ -26,7 +27,7 @@ class StorageTbl(object):
 
         return ret_dict
 
-
+    @validate(util_schema.JSON_SCHEMA_FEED)
     def on_post_feed(self, req, resp):
         # 0. check rack-bot status
         ret_dict = self.chk_rack_bot()
@@ -70,6 +71,7 @@ class StorageTbl(object):
         resp.status = falcon.HTTP_200
         resp.text   = json.dumps(ret_dict)
 
+    @validate(util_schema.JSON_SCHEMA_PICK)
     def on_post_pick(self, req, resp):
         # 0. check rack-bot status
         ret_dict = self.chk_rack_bot()
@@ -100,7 +102,7 @@ class StorageTbl(object):
                     ret_dict = build_ret_dict(200, "Fail to execute sql operations")
                 else:
                     # 3. insert a pick_rec
-                    job_data['REASON'] = 'AGV'
+                    job_data['REASON'] = one_pick['reason']
                     rec_id = util_sql.add_pick_rec(job_data)
 
                     # 4. add a job to rack
@@ -118,6 +120,7 @@ class StorageTbl(object):
         resp.status = falcon.HTTP_200
         resp.text   = json.dumps(ret_dict)
 
+    @validate(util_schema.JSON_SCHEMA_UPD_PICK_REQ)
     def on_post_pickreq(self, req, resp):
         obj = req.get_media()
         data = obj.get('data')
@@ -153,9 +156,21 @@ class InventoryTbl(object):
         resp.status = falcon.HTTP_200
 
 
+def handle_uncaught_exception(req, resp, ex, params):
+    logging.exception('Unhandled error - {}'.format(req))
+    raise falcon.HTTPInternalServerError(title='App error')
+
+def handle_http_error(req, resp, ex, params):
+    logging.exception('HTTP error - {}'.format(req))
+    raise ex
+
 class MyService(falcon.App):
     def __init__(self, *args, **kwargs):
         super(MyService, self).__init__(*args, **kwargs)
+
+        # install error handler
+        self.add_error_handler(falcon.HTTPError, handle_http_error)
+        self.add_error_handler(Exception, handle_uncaught_exception)
 
         # Create resources
         inv_tbl = InventoryTbl()
