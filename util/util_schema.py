@@ -24,8 +24,7 @@ JSON_SCHEMA_FEED = {
                     },
                     "stack_id": {
                         "type": "integer",
-                        "minimum": 1,
-                        "maximum": 30
+                        "minimum": 1
                     }
                 },
                 "required": [

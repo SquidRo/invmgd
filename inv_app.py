@@ -3,38 +3,43 @@ from falcon.media.validators.jsonschema import validate
 from util import util_utl, util_sql, util_rack, util_schema
 
 
-def build_ret_dict (ret_code, ret_desc):
-    tmp_ret = {'result': {} }
+def build_ret_dict(ret_code, ret_desc = None):
+    tmp_ret = {}
 
-    tmp_ret ['result']['code'] = ret_code
+    tmp_ret['code'] = ret_code
     if ret_desc:
-        tmp_ret ['result']['desc'] = ret_desc
+        tmp_ret['desc'] = ret_desc
 
     return tmp_ret
+
+def append_res_dict_desc(res_dict, ret_code, ret_desc = None):
+    res_dict["result"].append(build_ret_dict(ret_code, ret_desc))
+
+def append_res_dict_dict(res_dict, ret_code, ret_dict):
+    tmp_ret = build_ret_dict(ret_code)
+
+    for item in ret_dict:
+        tmp_ret[item] = ret_dict[item]
+
+    res_dict["result"].append(tmp_ret)
 
 class StorageTbl(object):
     def __init__(self):
         pass
 
-    def chk_rack_bot(self):
+    def chk_rack_bot(self, res_dict):
         is_bot_ok = util_rack.is_rack_bot_ready()
 
-        ret_dict = None
         if not is_bot_ok:
             err_msg = "RACK-BOT is not ready..."
             logging.error(err_msg)
-            ret_dict = build_ret_dict(200, err_msg)
+            append_res_dict_desc(res_dict, 200, err_msg)
 
-        return ret_dict
+        return is_bot_ok
 
     @validate(util_schema.JSON_SCHEMA_FEED)
     def on_post_feed(self, req, resp):
-        # 0. check rack-bot status
-        ret_dict = self.chk_rack_bot()
-        if ret_dict != None:
-            resp.status = falcon.HTTP_200
-            resp.text   = json.dumps(ret_dict)
-            return
+        res_dict = { "result": [] }
 
         # 1. query storage for free location
         obj = req.get_media()
@@ -50,7 +55,7 @@ class StorageTbl(object):
                 job_data = util_sql.put_inv_to_loc(loc_id, one_feed)
 
                 if job_data == None:
-                    ret_dict = build_ret_dict(200, "Fail to execute sql operations")
+                    append_res_dict_desc(res_dict, 200, "Fail to execute sql operations")
                 else:
                     # 3. insert a feed_rec
                     rec_id = util_sql.add_feed_rec(job_data)
@@ -59,26 +64,21 @@ class StorageTbl(object):
                     if rec_id != None:
                         job_data['FEED_REC'] = rec_id
                         util_rack.add_job(job_data)
-                        ret_dict = build_ret_dict(100, None)
+                        append_res_dict_desc(res_dict, 100)
+                        idx = idx + 1
                     else:
-                        ret_dict = build_ret_dict(200, "Fail to execute sql operations")
-
+                        append_res_dict_desc(res_dict, 200, "Fail to execute sql operations")
             else:
                 err_msg = "No space for the new inventory !"
                 logging.error(err_msg)
-                ret_dict = build_ret_dict(200, err_msg)
+                append_res_dict_desc(res_dict, 200, err_msg)
 
         resp.status = falcon.HTTP_200
-        resp.text   = json.dumps(ret_dict)
+        resp.text   = json.dumps(res_dict)
 
     @validate(util_schema.JSON_SCHEMA_PICK)
     def on_post_pick(self, req, resp):
-        # 0. check rack-bot status
-        ret_dict = self.chk_rack_bot()
-        if ret_dict != None:
-            resp.status = falcon.HTTP_200
-            resp.text   = json.dumps(ret_dict)
-            return
+        res_dict = { "result": [] }
 
         obj = req.get_media()
         data = obj.get('data')
@@ -89,9 +89,9 @@ class StorageTbl(object):
             loc_list = util_sql.get_inv_locs(one_pick['item'])
 
             if len(loc_list) == 0:
-                err_msg = "Inventory out of stock !!!"
+                err_msg = "Inventory ({}) out of stock !!!".format(one_pick['item'])
                 logging.error(err_msg)
-                ret_dict = build_ret_dict(200, err_msg)
+                append_res_dict_desc(res_dict, 200, err_msg)
 
             # ex: loc_list = [(1,), (2,), (3,), (4,), (5,)]
             for one_loc in loc_list:
@@ -99,7 +99,7 @@ class StorageTbl(object):
                 job_data = util_sql.rem_inv_from_loc(one_loc)
 
                 if job_data == None:
-                    ret_dict = build_ret_dict(200, "Fail to execute sql operations")
+                    append_res_dict_desc(res_dict, 200, "Fail to execute sql operations")
                 else:
                     # 3. insert a pick_rec
                     job_data['REASON'] = one_pick['reason']
@@ -109,16 +109,18 @@ class StorageTbl(object):
                     if rec_id != None:
                         job_data['PICK_REC'] = rec_id
                         util_rack.add_job(job_data)
-                        ret_dict = build_ret_dict(100, None)
-                        ret_dict['pkreq_id'] = rec_id
-                        ret_dict['stack_id'] = job_data['STACK_ID']
-                    else:
-                        ret_dict = build_ret_dict(200, "Fail to execute sql operations")
 
+                        tmp_dict = {}
+                        tmp_dict['pkreq_id'] = rec_id
+                        tmp_dict['stack_id'] = job_data['STACK_ID']
+
+                        append_res_dict_dict(res_dict, 100, tmp_dict)
+                    else:
+                        append_res_dict_desc(res_dict, 200, "Fail to execute sql operations")
                 break
 
         resp.status = falcon.HTTP_200
-        resp.text   = json.dumps(ret_dict)
+        resp.text   = json.dumps(res_dict)
 
     @validate(util_schema.JSON_SCHEMA_UPD_PICK_REQ)
     def on_post_pickreq(self, req, resp):
@@ -134,17 +136,18 @@ class StorageTbl(object):
         if 'conv_id' in data:
             conv_id = data['conv_id']
 
+        res_dict = {}
         if None in [ pkreq_id, conv_id ]:
-            ret_dict = build_ret_dict(200, "pkreq_id or conv_id not found !!!")
+            res_dict["result"] = build_ret_dict(200, "pkreq_id or conv_id not found !!!")
         else:
             ret_val = util_sql.upd_pkreq_conv_id(pkreq_id, conv_id)
             if ret_val != 0:
-                ret_dict = build_ret_dict(200, "Fail to execute sql operations")
+                res_dict["result"] = build_ret_dict(200, "Fail to execute sql operations")
             else:
-                ret_dict = build_ret_dict(100, None)
+                res_dict["result"] = build_ret_dict(100)
 
         resp.status = falcon.HTTP_200
-        resp.text   = json.dumps(ret_dict)
+        resp.text   = json.dumps(res_dict)
 
 
 class InventoryTbl(object):

@@ -13,7 +13,7 @@ RACK_QUEUE  = None
 RACK_THREAD = None
 RACK_VAR    = None     # shared variable for rack-bot's status
 
-MOVE_DELAY_TIME = 10   # simulating time consumed for moving inventory
+MOVE_DELAY_TIME = 1    # simulating time consumed for moving inventory
 RACK_BOT_READY  = 0
 RACK_BOT_BUSY   = 1
 
