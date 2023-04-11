@@ -3,6 +3,11 @@ from falcon.media.validators.jsonschema import validate
 from util import util_utl, util_sql, util_rack, util_schema
 
 
+SQL_ER_MSG     = "Fail to execute sql operations !"
+DATA_EMPTY_MSG = "Data is empty !"
+STO_FULL_MSG   = "No space for the new inventory !"
+OUT_OF_STO_MSG = "Inventory ({}) out of stock !!!"
+
 def build_ret_dict(ret_code, ret_desc = None):
     tmp_ret = {}
 
@@ -55,7 +60,7 @@ class StorageTbl(object):
                 job_data = util_sql.put_inv_to_loc(loc_id, one_feed)
 
                 if job_data == None:
-                    append_res_dict_desc(res_dict, 200, "Fail to execute sql operations")
+                    append_res_dict_desc(res_dict, 200, SQL_ER_MSG)
                 else:
                     # 3. insert a feed_rec
                     rec_id = util_sql.add_feed_rec(job_data)
@@ -67,11 +72,14 @@ class StorageTbl(object):
                         append_res_dict_desc(res_dict, 100)
                         idx = idx + 1
                     else:
-                        append_res_dict_desc(res_dict, 200, "Fail to execute sql operations")
+                        append_res_dict_desc(res_dict, 200, SQL_ER_MSG)
             else:
-                err_msg = "No space for the new inventory !"
-                logging.error(err_msg)
-                append_res_dict_desc(res_dict, 200, err_msg)
+                logging.error(STO_FULL_MSG)
+                append_res_dict_desc(res_dict, 200, STO_FULL_MSG)
+
+        if len(res_dict["result"]) == 0:
+            logging.error(DATA_EMPTY_MSG)
+            append_res_dict_desc(res_dict, 200, DATA_EMPTY_MSG)
 
         resp.status = falcon.HTTP_200
         resp.text   = json.dumps(res_dict)
@@ -89,7 +97,7 @@ class StorageTbl(object):
             loc_list = util_sql.get_inv_locs(one_pick['item'])
 
             if len(loc_list) == 0:
-                err_msg = "Inventory ({}) out of stock !!!".format(one_pick['item'])
+                err_msg = OUT_OF_STO_MSG.format(one_pick['item'])
                 logging.error(err_msg)
                 append_res_dict_desc(res_dict, 200, err_msg)
 
@@ -99,7 +107,7 @@ class StorageTbl(object):
                 job_data = util_sql.rem_inv_from_loc(one_loc)
 
                 if job_data == None:
-                    append_res_dict_desc(res_dict, 200, "Fail to execute sql operations")
+                    append_res_dict_desc(res_dict, 200, SQL_ER_MSG)
                 else:
                     # 3. insert a pick_rec
                     job_data['REASON'] = one_pick['reason']
@@ -116,8 +124,12 @@ class StorageTbl(object):
 
                         append_res_dict_dict(res_dict, 100, tmp_dict)
                     else:
-                        append_res_dict_desc(res_dict, 200, "Fail to execute sql operations")
+                        append_res_dict_desc(res_dict, 200, SQL_ER_MSG)
                 break
+
+        if len(res_dict["result"]) == 0:
+            logging.error(DATA_EMPTY_MSG)
+            append_res_dict_desc(res_dict, 200, DATA_EMPTY_MSG)
 
         resp.status = falcon.HTTP_200
         resp.text   = json.dumps(res_dict)
@@ -142,7 +154,7 @@ class StorageTbl(object):
         else:
             ret_val = util_sql.upd_pkreq_conv_id(pkreq_id, conv_id)
             if ret_val != 0:
-                res_dict["result"] = build_ret_dict(200, "Fail to execute sql operations")
+                res_dict["result"] = build_ret_dict(200, SQL_ER_MSG)
             else:
                 res_dict["result"] = build_ret_dict(100)
 

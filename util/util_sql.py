@@ -14,6 +14,9 @@ TBL_NAME_INVENTORY = 'INVENTORY'
 TBL_NAME_FEED_REC  = 'FEEDING_REC'
 TBL_NAME_PICK_REC  = 'PICKING_REC'
 
+SQL_PL_NAME_MAIN   = 'sql_main'
+SQL_PL_NAME_RACK   = 'sql_rack'
+
 SQL_TABLES = {}
 
 SQL_TABLES[TBL_NAME_INVENTORY] = (
@@ -63,7 +66,6 @@ SQL_TABLES[TBL_NAME_PICK_REC] = (
     ") ENGINE=InnoDB".format(TBL_NAME_PICK_REC) )
 
 
-SQL_CNX          = None
 INVENTORY_ID_MAP = {}
 
 
@@ -109,7 +111,7 @@ def create_dflt_data():
 def create_sql_tbls(db_name):
     do_dflt_data = True
 
-    db, sql_cursor = get_sql_cursor(False)
+    db, sql_cursor = get_sql_cursor(is_use_db = False)
 
     try:
 
@@ -174,16 +176,27 @@ def build_inventory_id_map():
 # also create default tables and inventroy id mapping
 # for later operations
 def setup_sql_cnx():
-    global SQL_CNX
 
     try:
-        SQL_CNX = mysql.connector.connect(
+        cnx = mysql.connector.connect(
                 user     = util_utl.CFG_TBL["SQL_USER"],
                 password = util_utl.CFG_TBL["SQL_PASS"],
                 host     = util_utl.CFG_TBL["SQL_HOST"],
                 port     = util_utl.CFG_TBL["SQL_PORT"],
-                pool_name = 'test',
-                pool_size = 3)
+                pool_name = SQL_PL_NAME_MAIN,
+                pool_size = 2)
+
+        cnx.close()
+
+        cnx_rack = mysql.connector.connect(
+                user     = util_utl.CFG_TBL["SQL_USER"],
+                password = util_utl.CFG_TBL["SQL_PASS"],
+                host     = util_utl.CFG_TBL["SQL_HOST"],
+                port     = util_utl.CFG_TBL["SQL_PORT"],
+                pool_name = SQL_PL_NAME_RACK,
+                pool_size = 2)
+
+        cnx_rack.close()
 
     except mysql.connector.Error as err:
         if err.errno == mysql.connector.errorcode.ER_ACCESS_DENIED_ERROR:
@@ -201,8 +214,9 @@ def setup_sql_cnx():
     build_inventory_id_map()
 
 # get connection from pool, and create cursor
-def get_sql_cursor(is_use_db = True):
-    db = mysql.connector.connect(pool_name = 'test')
+def get_sql_cursor(pl_name = SQL_PL_NAME_MAIN, is_use_db = True):
+
+    db = mysql.connector.connect(pool_name = pl_name)
     db_cursor = db.cursor()
     if is_use_db:
         db_cursor.execute("USE {}".format(util_utl.CFG_TBL["SQL_DB"]))
@@ -425,13 +439,17 @@ def upd_pkreq_conv_id(rec_id, conv_id):
 
     return ret_val
 
+
+# APIs below are for rack only
+# ==========================================
+
 def upd_history_rec(tbl_name, rack_bot, id_name, rec_id):
     sql_stmt = ("UPDATE {} "
                 "SET RACK_BOT={} "
                 "WHERE {}={}".format(
                 tbl_name, rack_bot, id_name, rec_id))
 
-    db, sql_cursor = get_sql_cursor()
+    db, sql_cursor = get_sql_cursor(SQL_PL_NAME_RACK)
 
     try:
         sql_cursor.execute(sql_stmt)
@@ -448,7 +466,7 @@ def upd_sto_ready(rdy_val, loc_id):
                 "WHERE LOC_ID={}".format(
                 TBL_NAME_STORAGE, rdy_val, loc_id))
 
-    db, sql_cursor = get_sql_cursor()
+    db, sql_cursor = get_sql_cursor(SQL_PL_NAME_RACK)
 
     try:
         sql_cursor.execute(sql_stmt)
@@ -465,7 +483,7 @@ def clear_sto_loc(loc_id):
                 "WHERE LOC_ID={}".format(
                 TBL_NAME_STORAGE, loc_id))
 
-    db, sql_cursor = get_sql_cursor()
+    db, sql_cursor = get_sql_cursor(SQL_PL_NAME_RACK)
 
     try:
         sql_cursor.execute(sql_stmt)
