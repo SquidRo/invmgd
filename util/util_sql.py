@@ -266,10 +266,6 @@ def rem_inv_from_loc(loc_data):
     return job
 
 def get_inv_locs(inv_name):
-    db, sql_cursor = get_sql_cursor()
-
-    ret_locs = []
-
     if inv_name in INVENTORY_ID_MAP:
         inv_id = INVENTORY_ID_MAP[inv_name]['id']
     else:
@@ -278,6 +274,10 @@ def get_inv_locs(inv_name):
     if None in [inv_id]:
         logging.error("Incorrect inventory name - {}!!! ".format(inv_name))
         return []
+
+    db, sql_cursor = get_sql_cursor()
+
+    ret_locs = []
 
     sql_stmt = ("SELECT LOC_ID, INV_ID, QUANTITY, STACK_ID FROM {} "
                 "WHERE INV_ID={} and `READY`=1".format(TBL_NAME_STORAGE, inv_id))
@@ -303,7 +303,6 @@ def get_inv_locs(inv_name):
 #        }
 def put_inv_to_loc(loc_id, data):
     job        = None
-    db, sql_cursor = get_sql_cursor()
 
     # ex:
     #   loc_id : (1,)
@@ -331,6 +330,8 @@ def put_inv_to_loc(loc_id, data):
     if None in [inv_id, count, stack_id]:
         logging.error("Failed to get inventory id, count or stack id !!!")
         return job
+
+    db, sql_cursor = get_sql_cursor()
 
     sql_stmt = ("UPDATE {} SET INV_ID={}, QUANTITY={}, STACK_ID={}, READY=0 "
                 "WHERE LOC_ID={}".format(TBL_NAME_STORAGE, inv_id, count, stack_id, loc_id[0]))
