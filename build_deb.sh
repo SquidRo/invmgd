@@ -11,4 +11,4 @@ tar czvf ../${PKG_NAM}_${PKG_VER}.orig.tar.gz .
 
 cp postinst debian/python3-${PKG_NAM}.postinst
 
-dpkg-buildpackage
+dpkg-buildpackage -uc -us
