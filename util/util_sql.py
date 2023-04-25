@@ -13,6 +13,7 @@ TBL_NAME_STORAGE   = 'STORAGE'
 TBL_NAME_INVENTORY = 'INVENTORY'
 TBL_NAME_FEED_REC  = 'FEEDING_REC'
 TBL_NAME_PICK_REC  = 'PICKING_REC'
+TBL_NAME_INV_BOX   = 'INV_BOX'
 
 SQL_PL_NAME_MAIN   = 'sql_main'
 SQL_PL_NAME_RACK   = 'sql_rack'
@@ -27,6 +28,16 @@ SQL_TABLES[TBL_NAME_INVENTORY] = (
     "  `RESERVED_STACK` int NOT NULL,"
     "  PRIMARY KEY (`INV_ID`)"
     ") ENGINE=InnoDB".format(TBL_NAME_INVENTORY) )
+
+SQL_TABLES[TBL_NAME_INV_BOX] = (
+    "CREATE TABLE `{}` ("
+    "  `INV_ID` int NOT NULL AUTO_INCREMENT,"
+    "  `NUM_PER_BOX` int NOT NULL, "
+    "  `3F_DEMAND` int DEFAULT 0 NOT NULL,"
+    "  `3F_STOCK` int DEFAULT 0 NOT NULL,"
+    "  `3F_USED` int DEFAULT 0 NOT NULL,"
+    "  PRIMARY KEY (`INV_ID`)"
+    ") ENGINE=InnoDB".format(TBL_NAME_INV_BOX) )
 
 SQL_TABLES[TBL_NAME_STORAGE] = (
     "CREATE TABLE `{}` ("
@@ -67,7 +78,7 @@ SQL_TABLES[TBL_NAME_PICK_REC] = (
 
 
 INVENTORY_ID_MAP = {}
-
+INV_BOX_MAP = {}
 
 def create_sql_db(sql_cursor, db_name):
     ret_val = True
@@ -82,6 +93,8 @@ def create_sql_db(sql_cursor, db_name):
 
 # create default data for sw develepment
 def create_dflt_data():
+
+    # default data for INVENTORY
     add_inv = ("INSERT INTO {} "
                "(INV_NAME, WEIGHT, RESERVED_STACK) "
                "VALUES (%s, %s, %s)".format(TBL_NAME_INVENTORY))
@@ -95,6 +108,7 @@ def create_dflt_data():
     # Make sure data is committed to the database
     db.commit()
 
+    # default data for STORAGE
     add_sto = ("INSERT INTO {} "
                "(INV_ID, QUANTITY, STACK_ID, READY) "
                "VALUES (%s, %s, %s, %s)".format(TBL_NAME_STORAGE))
@@ -103,6 +117,19 @@ def create_dflt_data():
         sql_cursor.execute(add_sto, data)
 
     db.commit()
+
+
+    # default data for INV_BOX
+    add_inv_box = ("INSERT INTO {} "
+                   "(NUM_PER_BOX) "
+                   "VALUES (%s)".format(TBL_NAME_INV_BOX))
+
+    for data in util_dflt.DFLT_INV_BOX_DATA:
+        sql_cursor.execute(add_inv_box, data)
+
+    db.commit()
+
+
     sql_cursor.close()
     db.close()
 
@@ -158,16 +185,20 @@ def log_func_name(f):
         return result
     return wrapped
 
-def build_inventory_id_map():
+# cached some mapping data from db for later usage
+def build_data_map():
     db, sql_cursor = get_sql_cursor()
 
-    query = ("SELECT * FROM {} ".format(TBL_NAME_INVENTORY))
+    query = ("SELECT * FROM {}, {} where {}.INV_ID = {}.INV_ID".format(
+            TBL_NAME_INVENTORY, TBL_NAME_INV_BOX, TBL_NAME_INVENTORY, TBL_NAME_INV_BOX))
 
     sql_cursor.execute(query)
     result = sql_cursor.fetchall()
 
+    # one_inv ex: (1, 'K2V4PCB', 9, 6, 1, 180, 0, 0, 0)
     for one_inv in result:
         INVENTORY_ID_MAP[one_inv[1]] = {'id' : one_inv[0]}
+        INV_BOX_MAP[one_inv[0]] = {'npb': one_inv[5]}
 
     sql_cursor.close()
     db.close()
@@ -211,7 +242,7 @@ def setup_sql_cnx():
 
     create_sql_tbls(util_utl.CFG_TBL["SQL_DB"])
 
-    build_inventory_id_map()
+    build_data_map()
 
 # get connection from pool, and create cursor
 def get_sql_cursor(pl_name = SQL_PL_NAME_MAIN, is_use_db = True):
@@ -276,8 +307,6 @@ def get_inv_locs(inv_name):
         return []
 
     db, sql_cursor = get_sql_cursor()
-
-    ret_locs = []
 
     sql_stmt = ("SELECT LOC_ID, INV_ID, QUANTITY, STACK_ID FROM {} "
                 "WHERE INV_ID={} and `READY`=1".format(TBL_NAME_STORAGE, inv_id))
@@ -495,6 +524,27 @@ def clear_sto_loc(loc_id):
     sql_cursor.close()
     db.close()
 
+def add_demand_box(data):
+
+    inv_id = data['INV_ID']
+    cnt    = data['COUNT'] // INV_BOX_MAP[inv_id]['npb']
+
+    sql_stmt = ("UPDATE {} "
+                "SET 3F_DEMAND=3F_DEMAND + {} "
+                "WHERE INV_ID={}".format(
+                TBL_NAME_INV_BOX, cnt, inv_id))
+
+    db, sql_cursor = get_sql_cursor(SQL_PL_NAME_RACK)
+
+    try:
+        sql_cursor.execute(sql_stmt)
+        db.commit()
+    except mysql.connector.Error as err:
+        logging.error("execute {} : {}".format(sql_stmt, err))
+
+    sql_cursor.close()
+    db.close()
+
 @log_func_name
 def upd_rec(data, is_ok = True):
     # 1. update feed_rec/pick_rec
@@ -513,6 +563,10 @@ def upd_rec(data, is_ok = True):
         else:
             # clear row
             clear_sto_loc(data['LOC_ID'])
+
+            # add demand box
+            add_demand_box(data)
+
     else:
         if 'FEED_REC' in data:
             # clear row

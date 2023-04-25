@@ -15,6 +15,26 @@ DFLT_INV_DATA = [
     ("BRACKET",   3, 3)
 ]
 
+# number per box
+DFLT_NPB_PCB      = 180
+DFLT_NPB_TPM      = 4095
+DFLT_NPB_IRON     = 1800
+DFLT_NPB_CAGE     = 336
+DFLT_NPB_HEAT_SINK= 234
+DFLT_NPB_AIR_B    = 780
+DFLT_NPB_BRACKET  = 1144
+
+# ex: (quan)
+DFLT_INV_BOX_DATA = [
+    (DFLT_NPB_PCB,),
+    (DFLT_NPB_TPM,),
+    (DFLT_NPB_IRON,),
+    (DFLT_NPB_CAGE,),
+    (DFLT_NPB_HEAT_SINK,),
+    (DFLT_NPB_AIR_B,),
+    (DFLT_NPB_BRACKET,)
+]
+
 DFLT_NUM_PCB      = 180
 DFLT_NUM_TPM      = 4095
 DFLT_NUM_IRON     = 1800
