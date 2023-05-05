@@ -171,6 +171,55 @@ class InventoryTbl(object):
         resp.status = falcon.HTTP_200
 
 
+class InvBoxTbl(object):
+    def __init__(self):
+        pass
+
+    @validate(util_schema.JSON_SCHEMA_FEED_BOX)
+    def on_post_feed_box(self, req, resp):
+        res_dict = { "result": [] }
+
+        obj = req.get_media()
+        data = obj.get('data')
+
+        for one_feed_box in data:
+            ret_val = util_sql.add_stock_box(one_feed_box)
+
+            if ret_val != 0:
+                append_res_dict_desc(res_dict, 200, SQL_ER_MSG)
+            else:
+                append_res_dict_desc(res_dict, 100)
+
+        if len(res_dict["result"]) == 0:
+            logging.error(DATA_EMPTY_MSG)
+            append_res_dict_desc(res_dict, 200, DATA_EMPTY_MSG)
+
+        resp.status = falcon.HTTP_200
+        resp.text   = json.dumps(res_dict)
+
+    @validate(util_schema.JSON_SCHEMA_PICK_BOX)
+    def on_post_pick_box(self, req, resp):
+        res_dict = { "result": [] }
+
+        obj = req.get_media()
+        data = obj.get('data')
+
+        for one_pick_box in data:
+            ret_val = util_sql.add_used_box(one_pick_box)
+
+            if ret_val != 0:
+                append_res_dict_desc(res_dict, 200, SQL_ER_MSG)
+            else:
+                append_res_dict_desc(res_dict, 100)
+
+        if len(res_dict["result"]) == 0:
+            logging.error(DATA_EMPTY_MSG)
+            append_res_dict_desc(res_dict, 200, DATA_EMPTY_MSG)
+
+        resp.status = falcon.HTTP_200
+        resp.text   = json.dumps(res_dict)
+
+
 def handle_uncaught_exception(req, resp, ex, params):
     logging.exception('Unhandled error - {}'.format(req))
     raise falcon.HTTPInternalServerError(title='App error')
@@ -190,6 +239,7 @@ class MyService(falcon.App):
         # Create resources
         inv_tbl = InventoryTbl()
         sto_tbl = StorageTbl()
+        ivb_tbl = InvBoxTbl()
 
         # Build routes
         self.add_route('/inventory', inv_tbl)
@@ -197,6 +247,9 @@ class MyService(falcon.App):
         self.add_route('/feed', sto_tbl, suffix='feed')
         self.add_route('/pick', sto_tbl, suffix='pick')
         self.add_route('/upd_pick_req', sto_tbl, suffix='pickreq')
+
+        self.add_route('/feed_box', ivb_tbl, suffix='feed_box')
+        self.add_route('/pick_box', ivb_tbl, suffix='pick_box')
 
     def start(self):
         """ A hook to when a Gunicorn worker calls run()."""

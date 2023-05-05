@@ -95,3 +95,60 @@ JSON_SCHEMA_UPD_PICK_REQ = {
 }
 
 
+JSON_SCHEMA_FEED_BOX = {
+    "type": "object",
+    "properties": {
+        "data" : {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "item": {
+                        "type": "string"
+                    },
+                    "box_num": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                },
+                "required": [
+                    "item",
+                    "box_num",
+                ]
+            }
+        }
+    },
+    "required" : [
+        "data"
+    ]
+}
+
+
+JSON_SCHEMA_PICK_BOX = {
+    "type": "object",
+    "properties": {
+        "data" : {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "item": {
+                        "type": "string"
+                    },
+                    "box_num": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                },
+                "required": [
+                    "item",
+                    "box_num",
+                ]
+            }
+        }
+    },
+    "required" : [
+        "data"
+    ]
+}
+

@@ -469,8 +469,54 @@ def upd_pkreq_conv_id(rec_id, conv_id):
 
     return ret_val
 
+# return 0 - OK
+#        1 - FAIL
+def add_box_field(field, data):
+    ret_val = 0
 
-# APIs below are for rack only
+    # data ex: {'item': 'K2B4PCB', 'box_num': 1}
+    if data['item'] in INVENTORY_ID_MAP:
+        inv_id = INVENTORY_ID_MAP[data['item']]['id']
+    else:
+        inv_id = None
+
+    if None in [inv_id]:
+        logging.error("Failed to get inventory id !!!")
+        return 1
+
+    sql_stmt = ("UPDATE {} "
+                "SET {}={} + {} "
+                "WHERE INV_ID={}".format(
+                TBL_NAME_INV_BOX, field, field, data['box_num'], inv_id))
+
+    db, sql_cursor = get_sql_cursor()
+
+    try:
+        sql_cursor.execute(sql_stmt)
+        db.commit()
+    except mysql.connector.Error as err:
+        logging.error("execute {} : {}".format(sql_stmt, err))
+        ret_val = 1
+
+    sql_cursor.close()
+    db.close()
+
+    return ret_val
+
+# return 0 - OK
+#        1 - FAIL
+@log_func_name
+def add_stock_box(data):
+    return add_box_field('3F_STOCK', data)
+
+# return 0 - OK
+#        1 - FAIL
+@log_func_name
+def add_used_box(data):
+    return add_box_field('3F_USED', data)
+
+
+# APIs below are for rack thread only
 # ==========================================
 
 def upd_history_rec(tbl_name, rack_bot, id_name, rec_id):
@@ -525,7 +571,6 @@ def clear_sto_loc(loc_id):
     db.close()
 
 def add_demand_box(data):
-
     inv_id = data['INV_ID']
     cnt    = data['COUNT'] // INV_BOX_MAP[inv_id]['npb']
 
